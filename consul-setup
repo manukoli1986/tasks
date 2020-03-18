@@ -1,0 +1,104 @@
+#Setup of consul single node server and joining new node as consul client
+######################################
+######Server
+
+mkdir -p /etc/consul.d/config.json
+mkdir /var/consul
+
+/etc/consul.d/config.json
+{
+     "advertise_addr": "10.56.0.197",
+     "bind_addr": "10.56.0.197",
+     "bootstrap_expect": 1,
+     "client_addr": "0.0.0.0",
+     "datacenter": "DC1-SIT",
+     "data_dir": "/var/lib/consul",
+     "domain": "consul",
+     "enable_script_checks": true,
+     "dns_config": {
+         "enable_truncate": true,
+         "only_passing": true
+     },
+     "enable_syslog": true,
+     "encrypt": "UiVFqKLi+VNVRbvBPxWgV4X/5ZWA5vzlWyhZQnflNeU=",
+     "leave_on_terminate": true,
+     "log_level": "INFO",
+     "rejoin_after_leave": true,
+     "retry_join": [
+         "consul-SIT"
+     ],
+     "server": true,
+     "start_join": [
+         "consul-SIT"
+     ],
+     "ui": true
+}
+
+/etc/systemd/system/consul.service
+# Consul systemd service unit file
+[Unit]
+Description=Consul Service Discovery Agent
+Documentation=https://www.consul.io/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=consul
+Group=consul
+ExecStart=/usr/local/bin/consul agent -server -ui \
+        -advertise=10.56.0.197 \
+        -bind=10.56.110.0 \
+        -data-dir=/var/lib/consul \
+        -node=consul-SIT \
+        -config-dir=/etc/consul.d
+
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+TimeoutStopSec=5
+Restart=on-failure
+SyslogIdentifier=consul
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+#######################################
+#####Client
+
+mkdir -p /etc/consul.d/client
+mkdir /var/consul
+/etc/consul.d/client/config.json
+{
+    "server": false,
+    "datacenter": "DC1-SIT",
+    "data_dir": "/var/consul",
+    "encrypt": "UiVFqKLi+VNVRbvBPxWgV4X/5ZWA5vzlWyhZQnflNeU=",    #### Consul server key####
+    "log_level": "INFO",
+    "enable_syslog": true,
+    "leave_on_terminate": true,
+    "retry_join": [
+        "consul-SIT"
+    ],
+    "start_join": [
+        "consul-SIT"
+    ]
+}
+
+/etc/systemd/system/consul-client.service
+[Unit]
+Description=Consul Startup process
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c '/usr/bin/consul agent -config-dir /etc/consul.d/client'
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target
+
+#systemctl daemon-reload
+#systemctl start consul-client
+
